@@ -150,6 +150,10 @@ orca_usage() {
     echo '   - copies the files from service/$NAME/ to the running box named '"$ORCA_PREFIX"'-$NAME'
     echo '   - runs service_build, default implementation just restarts the box.'
     echo
+
+    echo "orca shell SERVICE"
+    echo '   - opens a shell in the running box named '"$ORCA_PREFIX"'-$NAME'
+    echo
 }
 
 ## orca commands ##
