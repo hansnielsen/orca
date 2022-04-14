@@ -116,14 +116,26 @@ orca_push_bundle() {(
     orca_source "$bundle/service"
     if [[ "$(type -t service_setup)" = function ]]; then
         lxc file push "${bundle}/service" "${container}/tmp/$ORCA_PREFIX-service" || exit 1
-        local bundle_exec="set -eux; cd /tmp; . $ORCA_PREFIX-service; rm -f $ORCA_PREFIX-service $ORCA_PREFIX-bundle.tar.gz; service_setup '$container' || exit 1"
+        local bundle_exec="set -eux; cd /tmp; . $ORCA_PREFIX-service; rm -f $ORCA_PREFIX-service $ORCA_PREFIX-bundle.tar.gz; service_setup '$container'"
         lxc exec "$container" "$@" -- bash -c "$bundle_exec" || {
             rm -rf "$tgz" "$tmpdir"
             exit 1
         }
     fi
     rm -rf "$tgz" "$tmpdir"
-    )}
+)}
+
+# run the service_ready hook in a container
+orca_push_service() {(
+    local container="$1"
+    local bundle="$2"
+    shift 2
+
+    [[ ! -d "$bundle" ]] && orcabort "bundle $bundle not found."
+    lxc file push "${bundle}/service" "${container}/tmp/$ORCA_PREFIX-service" || exit 1
+    local bundle_exec="set -eux; cd /tmp; . $ORCA_PREFIX-service; rm -f $ORCA_PREFIX-service; service_ready '$container'"
+    lxc exec "$container" "$@" -- bash -c "$bundle_exec"
+)}
 
 orca_usage() {
     echo "orca init"
@@ -219,6 +231,12 @@ orca_cmd_deploy() {
     fi
     orca_log "[+] Starting $vm_name"
     lxc start "$vm_name"
+
+    if [[ "$(type -t service_ready)" = function ]]; then
+      orca_log "[+] Running $svc ready()"
+      orca_lxd_wait_ready "$vm_name"
+      orca_push_service "$vm_name" "$svc" || orcabort "ready failed"
+    fi
 }
 
 orca_cmd_refresh() {
@@ -235,6 +253,12 @@ orca_cmd_refresh() {
 
         orca_log "[+] Restart $vm_name: start"
         lxc start "$vm_name"
+    fi
+
+    if [[ "$(type -t service_ready)" = function ]]; then
+      orca_log "[+] Running $svc ready()"
+      orca_lxd_wait_ready "$vm_name"
+      orca_push_service "$vm_name" "$svc" || orcabort "ready failed"
     fi
 }
 
