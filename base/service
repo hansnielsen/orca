@@ -1,4 +1,4 @@
-#!/bin/bash -u
+#!/bin/bash -eu
 
 service_setup() {
     # disable apt update on boot
@@ -8,6 +8,7 @@ service_setup() {
 
     # disable broken/unused services
     systemctl mask \
+        ModemManager.service \
         ondemand.service \
         iscsid.service \
         open-iscsi.service \
@@ -20,8 +21,6 @@ service_setup() {
         apparmor.service \
         systemd-modules-load.service \
         unattended-upgrades.service
-
-    chmod -x /etc/cron.daily/mlocate
 
     cd /home/ubuntu
     chown -R ubuntu:ubuntu .
@@ -38,4 +37,7 @@ service_setup() {
     apt-get upgrade -y
     apt-get remove -y snapd
     apt-get autoremove -y
+
+    # snapd doesn't properly clean up mounts so we do it manually
+    rm -f /etc/systemd/system/snap*
 }

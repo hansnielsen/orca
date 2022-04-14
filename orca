@@ -116,7 +116,7 @@ orca_push_bundle() {(
     orca_source "$bundle/service"
     if [[ "$(type -t service_setup)" = function ]]; then
         lxc file push "${bundle}/service" "${container}/tmp/$ORCA_PREFIX-service" || exit 1
-        local bundle_exec="set -x; cd /tmp; . $ORCA_PREFIX-service; rm -f $ORCA_PREFIX-service $ORCA_PREFIX-bundle.tar.gz; service_setup '$container' || exit 1"
+        local bundle_exec="set -eux; cd /tmp; . $ORCA_PREFIX-service; rm -f $ORCA_PREFIX-service $ORCA_PREFIX-bundle.tar.gz; service_setup '$container' || exit 1"
         lxc exec "$container" "$@" -- bash -c "$bundle_exec" || {
             rm -rf "$tgz" "$tmpdir"
             exit 1
