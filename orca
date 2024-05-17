@@ -1,7 +1,7 @@
 #!/bin/bash -eu
 
 ORCA_PREFIX=orca
-ORCA_LXD_PRESEED="
+ORCA_INCUS_PRESEED="
 networks:
 - name: orcabr0
   type: bridge
@@ -34,18 +34,18 @@ orcabort() {
     exit 1
 }
 
-orca_lxd_wait_ready() {
+orca_incus_wait_ready() {
     orca_log "[-] Waiting for network: $1"
-    local gateway=$(lxc network get orcabr0 ipv4.address | sed -e 's,/.*$,,')
+    local gateway=$(incus network get orcabr0 ipv4.address | sed -e 's,/.*$,,')
     local waitscript="while [[ ! -e /etc/resolv.conf || ! -e /home/ubuntu ]] || ! ping -c1 $gateway &>/dev/null; do sleep 0.1; done"
-    lxc exec "$1" -- bash -c "$waitscript"
+    incus exec "$1" -- bash -c "$waitscript"
     # wait for dbus
-    lxc exec "$1" -- bash -c "while ! pgrep dbus-daemon &>/dev/null; do sleep 0.1; done"
+    incus exec "$1" -- bash -c "while ! pgrep dbus-daemon &>/dev/null; do sleep 0.1; done"
 }
 
-orca_lxd_exists() { lxc config show "$1" &>/dev/null; }
+orca_incus_exists() { incus config show "$1" &>/dev/null; }
 
-orca_lxd_clone() {
+orca_incus_clone() {
     local src="$1"
     local dst="$2"
     if [[ "$src" = "$dst" ]]; then
@@ -54,25 +54,25 @@ orca_lxd_clone() {
     # if this is a remote image e.g. ubuntu:20.04
     # then do a default init instead of a copy
     if echo "$src" | grep ':' &>/dev/null; then
-        if orca_lxd_exists "$dst"; then
+        if orca_incus_exists "$dst"; then
             orca_log "[+] Deleting old $dst"
-            lxc delete --force "$dst"
+            incus delete --force "$dst"
         fi
-        lxc init "$src" "$dst"
-        lxc network attach orcabr0 "$dst" eth0
+        incus create "$src" "$dst"
+        incus network attach orcabr0 "$dst" eth0
     else
         local src_vm="$ORCA_PREFIX-$(echo "$src" | sed -e 's,@,--,' | tr '.' '-')"
-        if ! orca_lxd_exists "$src_vm"; then
+        if ! orca_incus_exists "$src_vm"; then
             orca_log "[+] Building $src"
             orca_cmd_template "$src"
             orca_log "[-] Build finished"
         fi
-        if orca_lxd_exists "$dst"; then
+        if orca_incus_exists "$dst"; then
             orca_log "[+] Deleting old $dst"
-            lxc delete --force "$dst"
+            incus delete --force "$dst"
         fi
         orca_log "[+] Cloning $src_vm -> $dst"
-        lxc copy "$src_vm" "$dst"
+        incus copy "$src_vm" "$dst"
     fi
 }
 
@@ -80,7 +80,7 @@ orca_lxd_clone() {
 orca_source() {
     # Make subnet available to service
     # for example, orca_subnet="172.27.0"
-    orca_subnet=$(lxc network get orcabr0 ipv4.address | cut -d. -f1-3)
+    orca_subnet=$(incus network get orcabr0 ipv4.address | cut -d. -f1-3)
     unset service_{build,prep,setup,deploy,refresh}
     if [[ -e "$1" ]]; then
         . "$1"
@@ -122,14 +122,14 @@ orca_push_bundle() {(
     orca_log "[ ] Pushing $bundle -> $container"
     rm -f "$tgz"
     tar --exclude .git --exclude ./service -C "$bundle" -czf "$tgz" . || exit 1
-    lxc file push "$tgz" "${container}/tmp/$ORCA_PREFIX-bundle.tar.gz" || exit 1
-    lxc exec "$container" -- tar --no-overwrite-dir -C / -xzf /tmp/$ORCA_PREFIX-bundle.tar.gz || exit 1
+    incus file push "$tgz" "${container}/tmp/$ORCA_PREFIX-bundle.tar.gz" || exit 1
+    incus exec "$container" -- tar --no-overwrite-dir -C / -xzf /tmp/$ORCA_PREFIX-bundle.tar.gz || exit 1
 
     orca_source "$bundle/service"
     if [[ "$(type -t service_setup)" = function ]]; then
-        lxc file push "${bundle}/service" "${container}/tmp/$ORCA_PREFIX-service" || exit 1
+        incus file push "${bundle}/service" "${container}/tmp/$ORCA_PREFIX-service" || exit 1
         local bundle_exec="set -ex; cd /tmp; . $ORCA_PREFIX-service; rm -f $ORCA_PREFIX-service $ORCA_PREFIX-bundle.tar.gz; service_setup '$container' '$orca_suffix' || exit 1"
-        lxc exec "$container" "$@" -- bash -c "$bundle_exec" || {
+        incus exec "$container" "$@" -- bash -c "$bundle_exec" || {
             rm -rf "$tgz" "$tmpdir"
             exit 1
         }
@@ -139,12 +139,12 @@ orca_push_bundle() {(
 
 orca_usage() {
     echo "orca init [SUBNET]"
-    echo "     initialize lxd"
+    echo "     initialize Incus"
     echo "     set subnet to SUBNET, defaulting to 172.27.0.1/24"
     echo
 
     echo "orca build SERVICE [SERVICE ...]"
-    echo '   - builds the LXD box "'"$ORCA_PREFIX"'-$NAME-build"'
+    echo '   - builds the Incus box "'"$ORCA_PREFIX"'-$NAME-build"'
     echo '     using the files in service/$NAME'
     echo '     and the functions in service/$NAME/service'
     echo
@@ -170,14 +170,14 @@ orca_cmd_build() {(
         orca_log "[+] Running $svc build()"
         service_build "$vm_build" "$orca_suffix" || orcabort "custom build failed"
     else
-        orca_lxd_clone "$service_base" "$vm_build" || orcabort "clone failed"
+        orca_incus_clone "$service_base" "$vm_build" || orcabort "clone failed"
     fi
     cd "$base"
     orca_log "[+] Starting $vm_build"
-    lxc start "$vm_build" || orcabort "lxc start failed"
-    orca_lxd_wait_ready "$vm_build"
+    incus start "$vm_build" || orcabort "incus start failed"
+    orca_incus_wait_ready "$vm_build"
     # add vm name(s) to /etc/hosts so sudo doesn't lag
-    lxc exec "$vm_build" -- bash -c "echo 127.0.0.1 $vm_name $vm_build >> /etc/hosts"
+    incus exec "$vm_build" -- bash -c "echo 127.0.0.1 $vm_name $vm_build >> /etc/hosts"
 
     if [[ "$(type -t service_prep)" = function ]]; then
         orca_log "[+] Running $svc prep()"
@@ -190,23 +190,23 @@ orca_cmd_build() {(
     orca_push_bundle "$vm_build" "$svc" || orcabort "push-bundle failed"
 
     orca_log "[+] Enabling apt-daily"
-    lxc exec "$vm_build" systemctl unmask apt-daily.timer
-    lxc exec "$vm_build" systemctl unmask apt-daily-upgrade.timer
+    incus exec "$vm_build" systemctl unmask apt-daily.timer
+    incus exec "$vm_build" systemctl unmask apt-daily-upgrade.timer
 
     orca_log "[+] Rewriting hostname and stopping $vm_build"
     # fix the hostname for rename. could use push for this.
-    lxc exec "$vm_build" -- hostnamectl set-hostname "$vm_name" || orcabort "hostname change failed"
-    lxc stop "$vm_build" || orcabort "lxc stop failed"
+    incus exec "$vm_build" -- hostnamectl set-hostname "$vm_name" || orcabort "hostname change failed"
+    incus stop "$vm_build" || orcabort "incus stop failed"
 )}
 
 orca_cmd_template() {(
     orca_service_parse "$1"
     orca_cmd_build "$1"
-    if orca_lxd_exists "$vm_name"; then
+    if orca_incus_exists "$vm_name"; then
         orca_log "[+] Deleting old $vm_name"
-        lxc delete --force "$vm_name"
+        incus delete --force "$vm_name"
     fi
-    lxc rename "${vm_name}-build" "$vm_name"
+    incus rename "${vm_name}-build" "$vm_name"
 )}
 
 orca_cmd_deploy() {(
@@ -216,16 +216,16 @@ orca_cmd_deploy() {(
     orca_cmd_build "$1" || orcabort "build failed"
     # stop and delete old box
     # TODO: rename old box instead of directly deleting it?
-    if orca_lxd_exists "$vm_name"; then
+    if orca_incus_exists "$vm_name"; then
         orca_log "[+] Stopping $vm_name"
-        lxc stop "$vm_name" || true
-        lxc delete "$vm_name"
+        incus stop "$vm_name" || true
+        incus delete "$vm_name"
     fi
     orca_log "[+] Deploying $vm_build -> $vm_name"
-    lxc move "$vm_build" "$vm_name"
-    lxc config set "$vm_name" boot.autostart true
-    lxc config set "$vm_name" boot.autostart.priority 5
-    lxc config set "$vm_name" boot.autostart.delay 0
+    incus move "$vm_build" "$vm_name"
+    incus config set "$vm_name" boot.autostart true
+    incus config set "$vm_name" boot.autostart.priority 5
+    incus config set "$vm_name" boot.autostart.delay 0
     if [[ "$(type -t service_deploy)" = function ]]; then
         orca_log "[+] Running $service deploy()"
         cd "$base/$svc"
@@ -233,7 +233,7 @@ orca_cmd_deploy() {(
         cd "$base"
     fi
     orca_log "[+] Starting $vm_name"
-    lxc start "$vm_name"
+    incus start "$vm_name"
 )}
 
 orca_cmd_refresh() {(
@@ -246,34 +246,34 @@ orca_cmd_refresh() {(
         cd "$base"
     else
         orca_log "[+] Restart $vm_name: stop"
-        lxc stop "$vm_name"
+        incus stop "$vm_name"
 
         orca_log "[+] Restart $vm_name: start"
-        lxc start "$vm_name"
+        incus start "$vm_name"
     fi
 )}
 
 orca_cmd_shell() {(
     orca_service_parse "$1"
-    lxc exec "$vm_name" bash
+    incus exec "$vm_name" bash
 )}
 
 orca_cmd_subnet() {
-    local old_subnet=$(lxc network get orcabr0 ipv4.address | cut -d. -f1-3)
+    local old_subnet=$(incus network get orcabr0 ipv4.address | cut -d. -f1-3)
     local new_subnet=$(echo "$1" | cut -d. -f1-3)
-    local containers=$(lxc list -f compact -c n | tail -n+2 | awk '{print $1}' | egrep "^${ORCA_PREFIX}-")
-    local old_prefix=$(lxc network get orcabr0 ipv4.address)
-    lxc network set orcabr0 ipv4.address "$1"
+    local containers=$(incus list -f compact -c n | tail -n+2 | awk '{print $1}' | egrep "^${ORCA_PREFIX}-")
+    local old_prefix=$(incus network get orcabr0 ipv4.address)
+    incus network set orcabr0 ipv4.address "$1"
     for vm_name in $containers; do
-        local old_ip=$(lxc config device get "$vm_name" eth0 ipv4.address)
+        local old_ip=$(incus config device get "$vm_name" eth0 ipv4.address)
         local ip_head=$(echo "$old_ip" | cut -d. -f1-3)
         local ip_tail=$(echo "$old_ip" | cut -d. -f4)
         local new_ip="${new_subnet}.${ip_tail}"
         if [[ -n "$old_ip" && "$old_subnet" = "$ip_head" ]]; then
             echo "[+] $vm_name: $old_ip -> $new_ip"
-            lxc stop "$vm_name"
-            lxc config device set "$vm_name" eth0 ipv4.address "$new_ip"
-            lxc start "$vm_name"
+            incus stop "$vm_name"
+            incus config device set "$vm_name" eth0 ipv4.address "$new_ip"
+            incus start "$vm_name"
         fi
     done
 }
@@ -288,25 +288,25 @@ orca_cmd_init() {
             orcabort "SUBNET should be of form a.b.c.d/24"
         fi
     fi
-    ORCA_LXD_PRESEED="$(echo "$ORCA_LXD_PRESEED" | sed "s,SUBNET,$orca_subnet,g")"
-    echo "$ORCA_LXD_PRESEED"
+    ORCA_INCUS_PRESEED="$(echo "$ORCA_INCUS_PRESEED" | sed "s,SUBNET,$orca_subnet,g")"
+    echo "$ORCA_INCUS_PRESEED"
 
     if zfs list data &>/dev/null; then
-        ORCA_LXD_PRESEED="$ORCA_LXD_PRESEED
+        ORCA_INCUS_PRESEED="$ORCA_INCUS_PRESEED
 storage_pools:
 - name: data
   driver: zfs
   config:
-    source: data/lxd
+    source: data/incus
 "
     else
-        ORCA_LXD_PRESEED="$ORCA_LXD_PRESEED
+        ORCA_INCUS_PRESEED="$ORCA_INCUS_PRESEED
 storage_pools:
 - name: data
   driver: lvm
 "
     fi
-    echo "$ORCA_LXD_PRESEED" | lxd init --preseed
+    echo "$ORCA_INCUS_PRESEED" | incus init --preseed
     echo 'orca() { ~/orca/orca "$@"; }
 build() { orca build "$@"; }
 shell() { orca shell "$@"; }

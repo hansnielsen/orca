@@ -12,9 +12,9 @@ Don't be afraid to read the `orca` source, it is a single ~300-line file with co
 
 ## Installing Orca
 
-`orca init` will set up LXD for you, assuming a ZFS pool is available called "data".
+`orca init` will set up Incus for you, assuming a ZFS pool is available called "data".
 
-It's possible to use LVM or file-backed LXD instead.
+It's possible to use LVM or file-backed Incus instead.
 
 ## Services
 
@@ -22,19 +22,19 @@ To create a new service, create a folder at `./service/$NAME`. All files in the 
 
 The base image is deployed in the same way as a service, and can be used as an example.
 
-There's a special file at `./service/$NAME/service` allowing you to hook various points in the build. This file uses shell functions, like the below code block. The first arg (`$1`) to each function is the lxd container name being used for your service.
+There's a special file at `./service/$NAME/service` allowing you to hook various points in the build. This file uses shell functions, like the below code block. The first arg (`$1`) to each function is the Incus container name being used for your service.
 
-Use `./orca deploy $NAME` to deploy your new service. Deploying a service first builds it as `orca-$NAME-build`, and if that is successful, replaces any running `orca-$NAME` with the built container. If you run into problems during the build, you can login to the build container with `lxc exec orca-$NAME-build bash` and inspect it, then try a deploy again after fixing your service script.
+Use `./orca deploy $NAME` to deploy your new service. Deploying a service first builds it as `orca-$NAME-build`, and if that is successful, replaces any running `orca-$NAME` with the built container. If you run into problems during the build, you can login to the build container with `incus exec orca-$NAME-build bash` and inspect it, then try a deploy again after fixing your service script.
 
 ### Example `service` file
 
 ```bash
-# service_build allows you to fully control the lxd container creation
+# service_build allows you to fully control the Incus container creation
 #   don't define this unless you want to use a different base image
-#   see orca_lxd_build_base in the `orca` script for an example of a manual service_build()
+#   see orca_incus_build_base in the `orca` script for an example of a manual service_build()
 # service_build() {
 #     # if service_build isn't defined, the default is to call an internal function:
-#     orca_lxd_clone_base "$1"
+#     orca_incus_clone_base "$1"
 # }
 
 # service_prep is called on the host, before the build container starts for your service
