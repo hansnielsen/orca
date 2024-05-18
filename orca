@@ -51,7 +51,7 @@ orca_incus_clone() {
     if [[ "$src" = "$dst" ]]; then
         orcabort "Service depends on itself ($src)"
     fi
-    # if this is a remote image e.g. ubuntu:20.04
+    # if this is a remote image e.g. images:ubuntu/noble/cloud
     # then do a default init instead of a copy
     if echo "$src" | grep ':' &>/dev/null; then
         if orca_incus_exists "$dst"; then
@@ -102,7 +102,7 @@ orca_service_parse() {
     if [[ ! -d "$svc" ]]; then
         orcabort "$svc not found"
     fi
-    service_base=base-ubuntu@20.04
+    service_base=base-ubuntu@24.04
     orca_source "$svc/service"
     if [[ "$(type -t service_base)" = function ]]; then
         service_base=$(service_base "$vm_name" "$orca_suffix")
@@ -306,7 +306,7 @@ storage_pools:
   driver: lvm
 "
     fi
-    echo "$ORCA_INCUS_PRESEED" | incus init --preseed
+    echo "$ORCA_INCUS_PRESEED" | incus admin init --preseed
     echo 'orca() { ~/orca/orca "$@"; }
 build() { orca build "$@"; }
 shell() { orca shell "$@"; }

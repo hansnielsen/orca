@@ -2,9 +2,9 @@
 
 service_base() {
     if [[ -z "${2-}" ]]; then
-        echo "ubuntu:20.04"
+        echo "images:ubuntu/noble/cloud"
     else
-        echo "ubuntu:$2"
+        echo "images:$2"
     fi
 }
 
