@@ -16,21 +16,14 @@ service_setup() {
 
     # disable broken/unused services
     systemctl mask \
-        ondemand.service \
-        iscsid.service \
-        open-iscsi.service \
         console-getty.service \
         dev-hugepages.mount \
         systemd-journald-audit.socket \
         systemd-remount-fs.service \
         systemd-sysctl.service \
         sys-kernel-config.mount \
-        apparmor.service \
         systemd-modules-load.service \
         unattended-upgrades.service
-
-    chmod -x /etc/cron.daily/mlocate
-    systemctl disable plocate-updatedb.timer
 
     cd /home/ubuntu
     chown -R ubuntu:ubuntu .
