@@ -102,7 +102,7 @@ orca_service_parse() {
     if [[ ! -d "$svc" ]]; then
         orcabort "$svc not found"
     fi
-    service_base=base-ubuntu@24.04
+    service_base=base-ubuntu
     orca_source "$svc/service"
     if [[ "$(type -t service_base)" = function ]]; then
         service_base=$(service_base "$vm_name" "$orca_suffix")

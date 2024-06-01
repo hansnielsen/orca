@@ -16,11 +16,21 @@ Don't be afraid to read the `orca` source, it is a single ~300-line file with co
 
 It's possible to use LVM or file-backed Incus instead.
 
+## Quickstart
+Running the following commands will create an apt-cache instance (so you're
+not fetching a ton of data from the internet every time you rebuild) and
+rebuild the base image to include a pointer to the cache. `orca template`
+works like `orca deploy` except without starting the instance afterwards.
+```
+./orca deploy apt-cache
+./orca template ubuntu-base
+```
+
 ## Services
 
 To create a new service, create a folder at `./service/$NAME`. All files in the service directory will automatically be copied to `/` at the root of the container upon build.
 
-The base image is deployed in the same way as a service, and can be used as an example.
+The base image is deployed in the same way as a service, and can be used as an example: `./orca build ubuntu-base`.
 
 There's a special file at `./service/$NAME/service` allowing you to hook various points in the build. This file uses shell functions, like the below code block. The first arg (`$1`) to each function is the Incus container name being used for your service.
 
