@@ -121,9 +121,14 @@ orca_push_bundle() {(
 
     orca_log "[ ] Pushing $bundle -> $container"
     rm -f "$tgz"
-    tar --exclude .git --exclude ./service -C "$bundle" -czf "$tgz" . || exit 1
+    tar --exclude .git --exclude ./service --exclude ./artifacts -C "$bundle" -czf "$tgz" . || exit 1
     incus file push "$tgz" "${container}/tmp/$ORCA_PREFIX-bundle.tar.gz" || exit 1
     incus exec "$container" -- tar --no-overwrite-dir -C / -xzf /tmp/$ORCA_PREFIX-bundle.tar.gz || exit 1
+
+    # follow all symlinks locally while pushing artifacts
+    if [[ -d "${bundle}/artifacts" ]]; then
+        incus file push --create-dirs --recursive "${bundle}/artifacts" "${container}/" || exit 1
+    fi
 
     orca_source "$bundle/service"
     if [[ "$(type -t service_setup)" = function ]]; then
