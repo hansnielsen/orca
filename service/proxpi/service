@@ -1,0 +1,24 @@
+#!/bin/bash -u
+
+DIR=/opt/proxpi
+VENV=${DIR}/.venv
+
+service_deploy() {
+    incus config set "$1" boot.autostart.priority 51
+}
+
+
+# https://github.com/EpicWink/proxpi
+service_setup() {
+    getent passwd proxpi || useradd proxpi --system --create-home --home $DIR --uid 500
+
+    apt update
+    apt-get install -y --no-install-recommends python3-venv
+
+    test -d $VENV || sudo -Hu proxpi python3 -m venv $VENV
+    sudo -Hu proxpi $VENV/bin/pip3 install --index-url https://pypi.org/simple/ --upgrade pip
+    sudo -Hu proxpi $VENV/bin/pip3 install --index-url https://pypi.org/simple/ proxpi gunicorn
+
+    systemctl daemon-reload
+    systemctl enable proxpi.service
+}

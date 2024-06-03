@@ -36,6 +36,12 @@ service_setup() {
         echo 'Acquire::http::proxy "http://orca-apt-cache:3142";' > /etc/apt/apt.conf.d/01proxy
     fi
 
+    if nc -z orca-proxpi 5000 &>/dev/null; then
+        echo "[+] Using PyPI cache"
+    else
+        rm /etc/pip.conf
+    fi
+
     apt-get update
     apt-get upgrade -y
     apt-get remove -y snapd

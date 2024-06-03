@@ -26,6 +26,11 @@ works like `orca deploy` except without starting the instance afterwards.
 ./orca template ubuntu-base
 ```
 
+You can cache Python packages automatically too:
+```
+orca deploy proxpi
+```
+
 ## Services
 
 To create a new service, create a folder at `./service/$NAME`. All files in the service directory will automatically be copied to `/` at the root of the container upon build.

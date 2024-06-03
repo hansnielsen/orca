@@ -1,0 +1,18 @@
+[Unit]
+Description=proxpi PyPI cache
+
+[Service]
+User=proxpi
+Group=proxpi
+WorkingDirectory=/opt/proxpi
+ExecStart=/opt/proxpi/.venv/bin/gunicorn \
+    --bind 0.0.0.0:5000 \
+    --threads 2 \
+    --preload \
+    --access-logfile - \
+    --access-logformat "%(h)s \"%(r)s\" %(s)s %(b)s %(M)dms" \
+    --logger-class proxpi.server._GunicornLogger \
+    proxpi.server:app
+
+[Install]
+WantedBy=multi-user.target
