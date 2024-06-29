@@ -1,5 +1,7 @@
 # Orca
 
+Orca is a minimal container orchestrator built on Incus (formerly LXD). It's the opposite of Kubernetes: simple and understable. There's no YAML: containers start out by copying your service folder verbatim. There's no Dockerfile or arcane build systems: containers are built (and re-built) by a bash script you write that runs in the container itself. Orca lets you run a complex container setup with the tools you already know and nothing more.
+
 The main commands are:
 
 ```bash
